@@ -155,4 +155,18 @@ handle_response(?SUCCESS_ATOM, Resp) ->
     {ok, Result};
 handle_response(?SUCCESS_SEQUENCE, Resp) ->
     Result = proplists:get_value(<<"r">>, Resp, undefined),
-    {ok, Result}.
+    {ok, Result};
+handle_response(?SUCCESS_PARTIAL, Resp) ->
+    Result = proplists:get_value(<<"r">>, Resp, undefined),
+    {more, Result};
+handle_response(?WAIT_COMPLETE, _Resp) ->
+    ok;
+handle_response(?CLIENT_ERROR, Resp) ->
+    [Result] = proplists:get_value(<<"r">>, Resp, undefined),
+    {client_error, Result};
+handle_response(?COMPILE_ERROR, Resp) ->
+    [Result] = proplists:get_value(<<"r">>, Resp, undefined),
+    {compile_error, Result};
+handle_response(?RUNTIME_ERROR, Resp) ->
+    [Result] = proplists:get_value(<<"r">>, Resp, undefined),
+    {error, Result}.

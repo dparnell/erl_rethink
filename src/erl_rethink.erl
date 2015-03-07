@@ -44,8 +44,7 @@ run(Connection, Query, Timeout) ->
 test() ->
     {ok, C} = connect(),
 
-    {ok, DbList} = run(C, db_list),
-    io:format("DBList = ~p~n", [DbList]),
-
-    {ok, Result} = run(C, {limit, db_list, 1}),
-    io:format("Result = ~p~n", [Result]).
+    io:format("DBList = ~p~n", [run(C, db_list)]),
+    io:format("Limited DBList = ~p~n", [run(C, {limit, db_list, 1})]),
+    io:format("table list = ~p~n", [run(C, {table_list, {db, <<"blah blah">>}})]),
+    io:format("table list = ~p~n", [run(C, table_list)]).
