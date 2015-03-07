@@ -1,0 +1,20 @@
+%% -*- mode: erlang;-*-
+
+{application, erl_rethink, [
+                         {description, "Erlang RethinkDB Driver"},
+                         {vsn, "0.0.1"},
+                         {modules, []},
+                         {registered, []},
+                         {applications, [
+                                         %% System applications
+                                         kernel,
+                                         stdlib,
+                                         inets,
+
+                                         %% other things we need
+                                         jsx
+                                        ]},
+                         {mod, {erl_rethink_app, []}},
+                         {env, [
+                               ]}
+                           ]}.
