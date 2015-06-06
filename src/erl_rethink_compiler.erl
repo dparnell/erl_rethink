@@ -22,4 +22,4 @@ compile({limit, Sequence, Count}) ->
     [?LIMIT, [compile(Sequence), Count]];
 
 compile(_) ->
-    error.
+    erlang:error(unhandled_term).

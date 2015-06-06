@@ -9,7 +9,9 @@
          close/1,
          run/3,
          run/2,
-         test/0
+         arun/2,
+         test/0,
+         atest/0
         ]).
 
 -define(SERVER, erl_rethink_server).
@@ -40,11 +42,29 @@ run(Connection, Query) ->
 run(Connection, Query, Timeout) ->
     gen_server:call(Connection, {run, Query}, Timeout).
 
+arun(Connection, Query) ->
+    gen_server:call(Connection, {arun, Query}, 30000).
+
 
 test() ->
     {ok, C} = connect(),
 
     io:format("DBList = ~p~n", [run(C, db_list)]),
     io:format("Limited DBList = ~p~n", [run(C, {limit, db_list, 1})]),
-    io:format("table list = ~p~n", [run(C, {table_list, {db, <<"blah blah">>}})]),
-    io:format("table list = ~p~n", [run(C, table_list)]).
+    io:format("table list should fail = ~p~n", [run(C, {table_list, {db, <<"blah blah">>}})]),
+    io:format("table list = ~p~n", [run(C, table_list)]),
+
+    ok = close(C).
+
+atest() ->
+    {ok, C} = connect(),
+
+    {ok, Token} = arun(C, db_list),
+    io:format("Sent query.  Token = ~p~n", [Token]),
+
+    receive
+        {rethinkdb, C, Token, Response} -> io:format("got response: ~p~n", [Response]);
+        Message -> io:format("Unexpected: ~p~n", [Message])
+    end,
+
+    ok = close(C).
