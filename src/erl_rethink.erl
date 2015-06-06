@@ -10,6 +10,8 @@
          run/3,
          run/2,
          arun/2,
+         acontinue/2,
+         astop/2,
          test/0,
          atest/0
         ]).
@@ -45,6 +47,11 @@ run(Connection, Query, Timeout) ->
 arun(Connection, Query) ->
     gen_server:call(Connection, {arun, Query}, 30000).
 
+acontinue(Connection, Token) ->
+    gen_server:cast(Connection, {acontinue, Token}).
+
+astop(Connection, Token) ->
+    gen_server:cast(Connection, {astop, Token}).
 
 test() ->
     {ok, C} = connect(),
@@ -56,6 +63,17 @@ test() ->
 
     ok = close(C).
 
+handle_data() ->
+    receive
+        {rethinkdb, C, Token, {more, Response}} -> io:format("got partial response: ~p documents~n", [length(Response)]),
+                                                   acontinue(C, Token),
+                                                   handle_data();
+        {rethinkdb, C, Token, {ok, Response}} -> io:format("got final response: ~p documents~n", [length(Response)]),
+                                                 acontinue(C, Token);
+        Message -> io:format("Unexpected: ~p~n", [Message])
+    end.
+
+
 atest() ->
     {ok, C} = connect(),
 
@@ -66,5 +84,10 @@ atest() ->
         {rethinkdb, C, Token, Response} -> io:format("got response: ~p~n", [Response]);
         Message -> io:format("Unexpected: ~p~n", [Message])
     end,
+
+    {ok, Token2} = arun(C, {table, {db, <<"clients">>}, <<"actions">>}),
+    io:format("Query 2: ~p~n", [Token2]),
+
+    handle_data(),
 
     ok = close(C).

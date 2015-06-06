@@ -88,10 +88,9 @@ handle_call({run, Query}, _From, State) ->
     {reply, Reply, State#state{ token = Token + 1 }};
 
 handle_call({arun, Query}, From, State) ->
-    Socket = State#state.socket,
     Token = State#state.token,
     {ReplyTo, _} = From,
-    gen_server:cast(self(), {arun, Query, Socket, Token}),
+    gen_server:cast(self(), {arun, Query, Token}),
     State2 = State#state{ token = Token + 1, reply_to = [{Token, ReplyTo} | State#state.reply_to]},
     {reply, {ok, Token}, State2};
 
@@ -101,9 +100,26 @@ handle_call(close, _From, State) ->
 handle_call(_Params, _From, _State) ->
     {error, "Unhandled call"}.
 
-handle_cast({arun, Query, Socket, Token}, State) ->
+handle_cast({arun, Query, Token}, State) ->
+    Socket = State#state.socket,
     Compiled = erl_rethink_compiler:compile(Query),
     ok = send(Socket, Token, [?START, Compiled]),
+    %% now we are running in async mode tell us when something comes in on the socket
+    inet:setopts(Socket, [{active, once}]),
+
+    {noreply, State};
+
+handle_cast({acontinue, Token}, State) ->
+    Socket = State#state.socket,
+    ok = send(Socket, Token, [?CONTINUE]),
+    %% now we are running in async mode tell us when something comes in on the socket
+    inet:setopts(Socket, [{active, once}]),
+
+    {noreply, State};
+
+handle_cast({astop, Token}, State) ->
+    Socket = State#state.socket,
+    ok = send(Socket, Token, [?STOP]),
     %% now we are running in async mode tell us when something comes in on the socket
     inet:setopts(Socket, [{active, once}]),
 
@@ -231,7 +247,7 @@ process_chunks(body, Chunks, State) ->
             NextData = binary:part(AllBytes, BytesRequired, Size - BytesRequired),
             Response = parse_response(ThisData),
             {_, State2} = dispatch_response(State#state.reply_token, Response, State),
-            State3 = State2#state { reply_bytes = [], reply_state = head },
+            State3 = State2#state { reply_bytes = [], reply_state = header },
             process_data(NextData, State3);
         true ->
             State2 = State#state { reply_bytes = Chunks },
@@ -254,7 +270,7 @@ found_header(Chunks, State) ->
             NextData = binary:part(Rest, Length, RestLength - Length),
             Response = parse_response(ThisData),
             {_, State2} = dispatch_response(Token, Response, State),
-            State3 = State2#state { reply_bytes = [], reply_state = head },
+            State3 = State2#state { reply_bytes = [], reply_state = header },
             process_data(NextData, State3);
         true ->
             %% we got less than the number of bytes we need :(
@@ -262,13 +278,16 @@ found_header(Chunks, State) ->
             {noreply, State2}
     end.
 
+update_reply_to(_Token, {more, _Result}, ReplyTargets) ->
+    ReplyTargets;
+update_reply_to(Token, _Response, ReplyTargets) ->
+    proplists:delete(Token, ReplyTargets).
+
 dispatch_response(Token, Response, State) ->
     ReplyTargets = State#state.reply_to,
-    io:format("ReplyTargets = ~p~n", [ReplyTargets]),
     TargetPID = proplists:get_value(Token, ReplyTargets),
-    io:format("TargetPID = ~p~n", [TargetPID]),
 
     TargetPID ! {rethinkdb, self(), Token, Response},
-    State2 = State#state { reply_token = undefined, reply_state = head, reply_bytes_needed = 0, reply_bytes = [], reply_to = proplists:delete(Token, ReplyTargets) },
+    State2 = State#state { reply_token = undefined, reply_state = header, reply_bytes_needed = 0, reply_bytes = [], reply_to = update_reply_to(Token, Response, ReplyTargets) },
 
     {noreply, State2}.
