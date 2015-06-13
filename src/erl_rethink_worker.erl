@@ -94,6 +94,13 @@ handle_call({arun, Query}, From, State) ->
     State2 = State#state{ token = Token + 1, reply_to = [{Token, ReplyTo} | State#state.reply_to]},
     {reply, {ok, Token}, State2};
 
+handle_call({arun, Query, QueryState}, From, State) ->
+    Token = State#state.token,
+    {ReplyTo, _} = From,
+    gen_server:cast(self(), {arun, Query, Token}),
+    State2 = State#state{ token = Token + 1, reply_to = [{Token, {ReplyTo, QueryState}} | State#state.reply_to]},
+    {reply, {ok, Token}, State2};
+
 handle_call(close, _From, State) ->
     State2 = close(State),
     {reply, ok, State2};
@@ -283,11 +290,16 @@ update_reply_to(_Token, {more, _Result}, ReplyTargets) ->
 update_reply_to(Token, _Response, ReplyTargets) ->
     proplists:delete(Token, ReplyTargets).
 
+send_query_response(Token, Response, {TargetPID, QueryState}) ->
+    TargetPID ! {rethinkdb, self(), Token, Response, QueryState};
+send_query_response(Token, Response, TargetPID) ->
+    TargetPID ! {rethinkdb, self(), Token, Response}.
+
 dispatch_response(Token, Response, State) ->
     ReplyTargets = State#state.reply_to,
-    TargetPID = proplists:get_value(Token, ReplyTargets),
+    ReplyTarget = proplists:get_value(Token, ReplyTargets),
+    send_query_response(Token, Response, ReplyTarget),
 
-    TargetPID ! {rethinkdb, self(), Token, Response},
     State2 = State#state { reply_token = undefined, reply_state = header, reply_bytes_needed = 0, reply_bytes = [], reply_to = update_reply_to(Token, Response, ReplyTargets) },
 
     {noreply, State2}.

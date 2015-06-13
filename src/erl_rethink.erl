@@ -10,6 +10,7 @@
          run/3,
          run/2,
          arun/2,
+         arun/3,
          acontinue/2,
          astop/2,
          test/0,
@@ -46,6 +47,9 @@ run(Connection, Query, Timeout) ->
 
 arun(Connection, Query) ->
     gen_server:call(Connection, {arun, Query}, 30000).
+
+arun(Connection, Query, QueryState) ->
+    gen_server:call(Connection, {arun, Query, QueryState}, 30000).
 
 acontinue(Connection, Token) ->
     gen_server:cast(Connection, {acontinue, Token}).
