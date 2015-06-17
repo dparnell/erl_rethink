@@ -17,13 +17,20 @@
 -define(GT, 21).
 -define(GE, 22).
 -define(NOT, 23).
+-define(GET_FIELD, 31).
 -define(FILTER, 39).
+-define(COUNT, 43).
 -define(DB_CREATE, 57).
 -define(DB_LIST, 59).
 -define(TABLE_CREATE, 60).
 -define(TABLE_LIST, 62).
+-define(OR, 66).
+-define(AND, 67).
 -define(FUNC, 69).
 -define(LIMIT, 71).
+-define(DEFAULT, 92).
+-define(CONTAINS, 93).
+-define(BRACKET, 170).
 
 -record(state, {
           variable_counter,
@@ -59,8 +66,12 @@ compile(Value, _State) when is_binary(Value) ->
     Value;
 compile(Value, _State) when is_number(Value) ->
     Value;
+compile(null, _State) ->
+    null;
 compile({datum, Datum}, State) ->
     [?DATUM, compile(Datum, State)];
+compile({array, Elements}, State) ->
+    [?MAKE_ARRAY, [compile(X, State) || X <- Elements]];
 compile({db, Database}, _State) ->
     [?DB, [Database]];
 compile({table_create, Name}, _State) ->
@@ -102,5 +113,17 @@ compile({ge, A, B}, State) ->
     [?GE, [compile(A, State), compile(B, State)]];
 compile({invert, Value}, State) ->
     [?NOT, [compile(Value, State)]];
+compile({all, Terms}, State) ->
+    [?AND, [compile(X, State) || X <- Terms]];
+compile({any, Terms}, State) ->
+    [?OR, [compile(X, State) || X <- Terms]];
+compile({count, Sequence}, State) ->
+    [?COUNT, [compile(Sequence, State)]];
+compile({default, A, B}, State) ->
+    [?DEFAULT, [compile(A, State), compile(B, State)]];
+compile({contains, A, B}, State) ->
+    [?CONTAINS, [compile(A, State), compile(B, State)]];
+compile({get_field, Object, Field}, State) ->
+    [?BRACKET, [compile(Object, State), compile(Field, State)]];
 compile(Query, _State) ->
     erlang:error({unhandled_term, Query}).
