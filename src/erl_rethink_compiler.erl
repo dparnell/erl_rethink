@@ -216,6 +216,10 @@ compile(Value, _State) when is_number(Value) ->
     Value;
 compile(null, _State) ->
     null;
+compile(true, _State) ->
+    true;
+compile(false, _State) ->
+    false;
 compile({datum, Datum}, State) ->
     [?DATUM, compile(Datum, State)];
 compile({array, Elements}, State) ->
